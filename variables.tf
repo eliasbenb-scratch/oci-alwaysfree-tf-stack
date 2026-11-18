@@ -64,23 +64,7 @@ variable "boot_volume_size_in_gbs" {
 }
 
 variable "assign_public_ip" {
-  description = "Assign a public IP for outbound Internet access through the Internet Gateway"
+  description = "Assign a public IP for SSH access and outbound Internet access through the Internet Gateway"
   type        = bool
   default     = true
-}
-
-variable "bootstrap_ssh_cidr" {
-  description = "Temporary public IPv4 /32 allowed to reach SSH; null closes public SSH ingress"
-  type        = string
-  default     = null
-  nullable    = true
-
-  validation {
-    condition = var.bootstrap_ssh_cidr == null || try(
-      length(regexall("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.bootstrap_ssh_cidr)) == 1 &&
-      cidrnetmask(var.bootstrap_ssh_cidr) == "255.255.255.255",
-      false
-    )
-    error_message = "bootstrap_ssh_cidr must be null or one IPv4 address with a /32 prefix."
-  }
 }

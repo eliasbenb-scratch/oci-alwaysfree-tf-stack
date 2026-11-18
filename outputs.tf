@@ -31,11 +31,7 @@ output "subnet_id" {
   value       = oci_core_subnet.this.id
 }
 
-output "bootstrap_ssh_access" {
-  description = "Whether temporary public SSH access is open and its scoped IPv4 /32"
-  sensitive   = false
-  value = {
-    enabled = var.bootstrap_ssh_cidr != null
-    cidr    = var.bootstrap_ssh_cidr
-  }
+output "block_volume_id" {
+  description = "OCID of the 150 GB data block volume"
+  value       = oci_core_volume.data.id
 }

@@ -23,7 +23,7 @@ data "oci_identity_availability_domains" "ads" {
 data "oci_core_images" "ubuntu" {
   compartment_id           = var.compartment_id
   operating_system         = "Canonical Ubuntu"
-  operating_system_version = "24.04"
+  operating_system_version = "26.04"
   shape                    = "VM.Standard.A1.Flex"
   sort_by                  = "TIMECREATED"
   sort_order               = "DESC"
@@ -102,30 +102,13 @@ resource "oci_core_default_security_list" "this" {
   ingress_security_rules {
     source      = "0.0.0.0/0"
     source_type = "CIDR_BLOCK"
-    protocol    = "17"
+    protocol    = "6"
     stateless   = false
-    description = "Tailscale direct connections"
+    description = "Public SSH access"
 
-    udp_options {
-      min = 41641
-      max = 41641
-    }
-  }
-
-  dynamic "ingress_security_rules" {
-    for_each = var.bootstrap_ssh_cidr == null ? [] : [var.bootstrap_ssh_cidr]
-
-    content {
-      source      = ingress_security_rules.value
-      source_type = "CIDR_BLOCK"
-      protocol    = "6"
-      stateless   = false
-      description = "Temporary bootstrap SSH access"
-
-      tcp_options {
-        min = 22
-        max = 22
-      }
+    tcp_options {
+      min = 22
+      max = 22
     }
   }
 }
@@ -156,7 +139,7 @@ resource "oci_core_instance" "this" {
     source_type             = "image"
     source_id               = local.image_id
     boot_volume_size_in_gbs = var.boot_volume_size_in_gbs
-    boot_volume_vpus_per_gb = 10
+    boot_volume_vpus_per_gb = 120
   }
 
   create_vnic_details {
@@ -225,4 +208,23 @@ resource "oci_core_instance" "this" {
       desired_state = "DISABLED"
     }
   }
+}
+
+# --- Block Storage ---
+
+resource "oci_core_volume" "data" {
+  compartment_id      = var.compartment_id
+  availability_domain = local.availability_domain
+  display_name        = "${var.name_prefix}-data"
+  size_in_gbs         = 150
+  vpus_per_gb         = 120
+}
+
+resource "oci_core_volume_attachment" "data" {
+  attachment_type                     = "paravirtualized"
+  instance_id                         = oci_core_instance.this.id
+  volume_id                           = oci_core_volume.data.id
+  is_read_only                        = false
+  is_shareable                        = false
+  is_pv_encryption_in_transit_enabled = true
 }

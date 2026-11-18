@@ -16,4 +16,3 @@ region = "us-chicago-1"
 # memory_in_gbs             = 24
 # boot_volume_size_in_gbs   = 50
 # assign_public_ip          = true
-# bootstrap_ssh_cidr        = "198.51.100.42/32" # Temporary; remove or set null after Tailscale handoff

@@ -3,7 +3,7 @@
 
 # oci-alwaysfree-tf-stack
 
-Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, with VCN, subnet, and internet gateway. Auto-discovers the availability domain and latest Ubuntu 24.04 image so you don't need to look up region-specific OCIDs.
+Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, with VCN, subnet, and internet gateway. Auto-discovers the availability domain and latest Ubuntu 26.04 image so you don't need to look up region-specific OCIDs. The selected region must offer an Ubuntu 26.04 image compatible with `VM.Standard.A1.Flex`.
 
 ---
 
@@ -12,10 +12,10 @@ Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, wit
 * 1 VCN
 * 1 Public Subnet
 * 1 Internet Gateway
-* A managed default security list with public Tailscale UDP and optional scoped Bootstrap SSH
+* A managed default security list allowing SSH (TCP port 22) from `0.0.0.0/0`
 * Up to 4 ARM Compute Instances
 * Up to 24GB Memory
-* Up to 200GB Block Storage
+* A 50 GB boot volume and an attached 150 GB block volume, both at 120 VPUs per GB
 
 ---
 
@@ -93,8 +93,7 @@ Only `compartment_id` and `region` are required. Everything else has sensible de
 | `ocpus` | `number` | `4` | ARM OCPUs (Always Free max: 4 total) |
 | `memory_in_gbs` | `number` | `24` | Memory in GB (Always Free max: 24 total) |
 | `boot_volume_size_in_gbs` | `number` | `50` | Boot volume in GB (Always Free max: 200 total) |
-| `assign_public_ip` | `bool` | `true` | Keep a public IP for outbound Internet access through the Internet Gateway |
-| `bootstrap_ssh_cidr` | `string` | `null` | Temporary workstation IPv4 `/32` allowed to reach public SSH; null allows no public SSH |
+| `assign_public_ip` | `bool` | `true` | Keep a public IP for SSH and outbound Internet access through the Internet Gateway |
 
 ---
 
@@ -102,31 +101,30 @@ Only `compartment_id` and `region` are required. Everything else has sensible de
 
 **SSH in** once the instance is running:
    ```bash
-   terraform apply -var='bootstrap_ssh_cidr=198.51.100.42/32'
    ssh -i ~/.ssh/your-key ubuntu@$(terraform output -raw instance_public_ip)
    ```
 
-Use only the workstation's current public IPv4 address with `/32`. After a
-tested Tailscale handoff, close public SSH while retaining the public IP for
-outbound traffic:
+The security list allows TCP port 22 from any IPv4 address (`0.0.0.0/0`). Authenticate with the private key matching the configured SSH public key.
 
-```bash
-# Remove bootstrap_ssh_cidr from terraform.tfvars, or set it to null there.
-terraform apply
-terraform output -json bootstrap_ssh_access
-```
+## Storage
+
+The OS boot volume defaults to 50 GB at 120 VPUs per GB. A separate 150 GB block volume at 120 VPUs per GB is attached to the instance in the same availability domain using an encrypted paravirtualized attachment. Retrieve its OCID with `terraform output -raw block_volume_id`.
+
+The data volume is attached as a raw disk. After deployment, identify it with `lsblk`, then create a filesystem and mount it before storing files. Terraform does not format the disk or configure a mount point.
+
+120 VPUs per GB is Oracle's Ultra High Performance tier. The current 4-OCPU `VM.Standard.A1.Flex` configuration does not support multipath Ultra High Performance block volume attachments; Oracle requires at least 16 OCPUs on that shape. The requested VPU settings are configured, but actual performance is constrained by the instance and attachment. See [Oracle's performance details](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeperformance.htm).
 
 ---
 
 ## Always Free Guardrails
 
-The defaults stay within free-tier limits. If you change them, make sure the totals across all your instances stay under these caps:
+The default storage capacity totals 200 GB across boot and data volumes, matching the home-region Always Free storage allowance when no other volumes consume it. The 120 VPUs per GB performance setting is separate from capacity; confirm your tenancy's billing treatment before applying. See [Oracle's storage allowance](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm#blockvolume) and [volume performance documentation](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeperformance.htm). If you change resource sizes, check the totals across all your instances:
 
 | Resource | This stack uses | Always Free limit |
 |----------|----------------|-------------------|
 | ARM OCPUs | 4 | 4 total |
 | Memory | 24 GB | 24 GB total |
-| Boot volume | 50 GB | 200 GB total |
+| Boot + data volumes | 50 GB + 150 GB = 200 GB | 200 GB total |
 | Instances | 1 | Up to 4 ARM + 2 AMD |
 | VCN | 1 | Included |
 
@@ -140,7 +138,7 @@ The defaults stay within free-tier limits. If you change them, make sure the tot
 terraform destroy
 ```
 
-Removes the instance, VCN, subnet, and gateway. Terraform state tracks what was created, so the destroy is clean and complete.
+Removes the instance, data block volume and its contents, VCN, subnet, and gateway. Terraform state tracks what was created, so the destroy is clean and complete.
 
 ---
 
@@ -154,7 +152,7 @@ Removes the instance, VCN, subnet, and gateway. Terraform state tracks what was 
 
 - **OCI authentication**: The provider uses `~/.oci/config` by default. See the [OCI Terraform provider docs](https://registry.terraform.io/providers/oracle/oci/latest/docs) for alternatives (env vars, instance principal, etc.).
 
-- **Public IP lifecycle**: Keep `assign_public_ip = true` in this Internet Gateway topology so the instance retains outbound Internet access. Set `bootstrap_ssh_cidr = null` after Tailscale handoff to remove public SSH ingress.
+- **Public IP lifecycle**: Keep `assign_public_ip = true` in this Internet Gateway topology for public SSH and outbound Internet access.
 
 - **Finding your OCIDs**:
   ```bash
