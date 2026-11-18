@@ -58,6 +58,8 @@ Cloud-init is defined in [main.tf](main.tf). It runs storage setup first and sto
 
 The attachment uses `/dev/oracleoci/oraclevdb`; fstab uses the filesystem UUID. Changing an existing attachment's device can require detach/reattach. Review the plan before applying to an existing deployment. Updating metadata does not rerun cloud-init on an existing instance.
 
+New data volumes are formatted as ext4 with 1% reserved for privileged processes.
+
 Existing containers and application data are not recreated by the stack.
 
 ## Capacity and performance

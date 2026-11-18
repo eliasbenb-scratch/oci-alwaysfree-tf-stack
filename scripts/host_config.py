@@ -162,7 +162,7 @@ def prepare_storage(device_name, timeout=600, include_runtimes=False):
   if not types:
     # Validate fstab conflicts before formatting. Never use -F: let mkfs
     # also reject any unexpected device state.
-    run("mkfs.ext4", "-U", uuid, str(device))
+    run("mkfs.ext4", "-m", "1", "-U", uuid, str(device))
   Path("/data").mkdir(exist_ok=True)
   if "/data" not in targets:
     run("mount", "-t", "ext4", "-o", "defaults,_netdev", str(device), "/data")
