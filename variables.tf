@@ -1,5 +1,5 @@
 # ABOUTME: Input variables for the OCI Always Free ARM instance stack.
-# ABOUTME: Compartment ID and region are required; everything else has defaults.
+# ABOUTME: Compartment ID, region, and an SSH public key string are required.
 
 variable "compartment_id" {
   description = "OCID of the compartment (usually your tenancy OCID for Always Free)"
@@ -18,15 +18,14 @@ variable "availability_domain_index" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key string. If null, reads from ssh_public_key_path instead."
+  description = "SSH public key string to authorize on the instance"
   type        = string
-  default     = null
-}
+  nullable    = false
 
-variable "ssh_public_key_path" {
-  description = "Path to SSH public key file (used when ssh_public_key is null)"
-  type        = string
-  default     = "~/.ssh/id_ed25519.pub"
+  validation {
+    condition     = length(trimspace(var.ssh_public_key)) > 0
+    error_message = "ssh_public_key must be a nonempty SSH public key string."
+  }
 }
 
 variable "name_prefix" {

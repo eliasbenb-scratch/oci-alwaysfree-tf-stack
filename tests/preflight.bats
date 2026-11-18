@@ -5,7 +5,7 @@ setup() {
   TEST_ROOT="$BATS_TEST_TMPDIR/root"
   TEST_HOME="$TEST_ROOT/home"
   TEST_BIN="$TEST_ROOT/bin"
-  mkdir -p "$TEST_HOME/.oci" "$TEST_HOME/.ssh/identities" "$TEST_BIN"
+  mkdir -p "$TEST_HOME/.oci" "$TEST_BIN"
 
   cat >"$TEST_BIN/terraform" <<'EOF'
 #!/usr/bin/env bash
@@ -36,9 +36,8 @@ EOF
   cat >"$TEST_ROOT/terraform.tfvars" <<'EOF'
 compartment_id = "ocid1.tenancy.test"
 region = "us-chicago-1"
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest fixture"
 EOF
-
-  : >"$TEST_HOME/.ssh/id_ed25519.pub"
 }
 
 run_preflight() {
@@ -65,21 +64,38 @@ EOF
   [[ "$output" == *"0 failed"* ]]
 }
 
-@test "preflight parses a spaced SSH public-key assignment portably" {
+@test "preflight accepts an inline SSH public key without a key file" {
   cat >"$TEST_HOME/.oci/oci_api_key.pem" <<'EOF'
 -----BEGIN PRIVATE KEY-----
 fixture
 -----END PRIVATE KEY-----
 EOF
   chmod 600 "$TEST_HOME/.oci/oci_api_key.pem"
-  : >"$TEST_HOME/.ssh/identities/operator.pub"
-  cat >>"$TEST_ROOT/terraform.tfvars" <<'EOF'
-ssh_public_key_path = "~/.ssh/identities/operator.pub"
-EOF
-
   run_preflight
 
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ssh public key found: $TEST_HOME/.ssh/identities/operator.pub"* ]]
+  [[ "$output" == *"ssh public key provided directly in terraform.tfvars"* ]]
   [[ "$output" == *"0 failed"* ]]
+}
+
+@test "preflight rejects missing and blank SSH public keys" {
+  cat >"$TEST_HOME/.oci/oci_api_key.pem" <<'EOF'
+-----BEGIN PRIVATE KEY-----
+fixture
+-----END PRIVATE KEY-----
+EOF
+  chmod 600 "$TEST_HOME/.oci/oci_api_key.pem"
+
+  for assignment in '' 'ssh_public_key = ""' 'ssh_public_key = "   "' 'ssh_public_key = null' '# ssh_public_key = "commented-out"'; do
+    cat >"$TEST_ROOT/terraform.tfvars" <<EOF
+compartment_id = "ocid1.tenancy.test"
+region = "us-chicago-1"
+$assignment
+EOF
+
+    run_preflight
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"set ssh_public_key to your SSH public key string"* ]]
+  done
 }

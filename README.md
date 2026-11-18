@@ -41,7 +41,7 @@ Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, wit
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-2. Edit `terraform.tfvars` — only two values are required:
+2. Edit `terraform.tfvars` — set `compartment_id`, `region`, and `ssh_public_key`:
    ```bash
    # Find your compartment (tenancy) OCID:
    oci iam compartment list --query 'data[0]."compartment-id"' --raw-output
@@ -49,6 +49,8 @@ Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, wit
    # List available regions:
    oci iam region list --query 'data[*].name' --raw-output
    ```
+
+   Paste the full SSH public key into `ssh_public_key` as a quoted string. Keep the matching private key on your machine for SSH access.
 
 3. Run the preflight check to catch config issues before they become cryptic Terraform errors:
    ```bash
@@ -69,7 +71,7 @@ Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, wit
 ```
 oci-alwaysfree-tf-stack/
 ├── main.tf                  # Provider, data sources, networking, compute
-├── variables.tf             # Input variables (2 required, 8 with defaults)
+├── variables.tf             # Input variables (3 required, 6 with defaults)
 ├── outputs.tf               # IPs, OCIDs for downstream use
 ├── terraform.tfvars.example # Copy to terraform.tfvars and fill in
 ├── preflight.sh             # Pre-deploy validation (OCI auth, keys, config)
@@ -80,15 +82,14 @@ oci-alwaysfree-tf-stack/
 
 ## Configuration
 
-Only `compartment_id` and `region` are required. Everything else has sensible defaults.
+`compartment_id`, `region`, and `ssh_public_key` are required. Everything else has sensible defaults.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `compartment_id` | `string` | *required* | OCID of the compartment (usually your tenancy OCID) |
 | `region` | `string` | *required* | OCI region identifier (e.g., `us-chicago-1`) |
 | `availability_domain_index` | `number` | `0` | Index into the AD list. Change if your preferred AD is full. |
-| `ssh_public_key` | `string` | `null` | SSH public key string. If null, reads from `ssh_public_key_path`. |
-| `ssh_public_key_path` | `string` | `~/.ssh/id_ed25519.pub` | Path to SSH public key file (used when `ssh_public_key` is null) |
+| `ssh_public_key` | `string` | *required* | Nonempty SSH public key string to authorize on the instance |
 | `name_prefix` | `string` | `"oci-arm"` | Prefix for resource display names and DNS labels |
 | `ocpus` | `number` | `4` | ARM OCPUs (Always Free max: 4 total) |
 | `memory_in_gbs` | `number` | `24` | Memory in GB (Always Free max: 24 total) |

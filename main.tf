@@ -32,7 +32,6 @@ data "oci_core_images" "ubuntu" {
 locals {
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[var.availability_domain_index].name
   image_id            = data.oci_core_images.ubuntu.images[0].id
-  ssh_public_key      = var.ssh_public_key != null ? var.ssh_public_key : file(pathexpand(var.ssh_public_key_path))
   dns_prefix          = replace(lower(var.name_prefix), "/[^a-z0-9]/", "")
 }
 
@@ -150,7 +149,7 @@ resource "oci_core_instance" "this" {
   }
 
   metadata = {
-    ssh_authorized_keys = local.ssh_public_key
+    ssh_authorized_keys = var.ssh_public_key
   }
 
   availability_config {

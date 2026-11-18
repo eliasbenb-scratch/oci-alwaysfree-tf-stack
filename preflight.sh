@@ -45,7 +45,7 @@ if [[ -f "$OCI_CONFIG" ]]; then
         fi
     done
 
-    # Check PEM key file
+    # Check the OCI API signing key (separate from the instance's SSH key).
     key_file=$(grep '^key_file=' "$OCI_CONFIG" | head -1 | cut -d= -f2 | sed "s|~|$HOME|")
     if [[ -n "$key_file" && -f "$key_file" ]]; then
         ok "  private key exists: $key_file"
@@ -78,26 +78,16 @@ else
     printf "       Docs: https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm\n"
 fi
 
-# --- SSH key ---
-ssh_path=""
-if [[ -f "terraform.tfvars" ]]; then
-    ssh_path=$(awk -F '"' '/^[[:space:]]*ssh_public_key_path[[:space:]]*=/ { print $2; exit }' terraform.tfvars 2>/dev/null || true)
-    if [[ "$ssh_path" == \~/* ]]; then
-        ssh_path="$HOME/${ssh_path:2}"
-    fi
-fi
-ssh_path="${ssh_path:-$HOME/.ssh/id_ed25519.pub}"
-
-if [[ -f "$ssh_path" ]]; then
-    ok "ssh public key found: $ssh_path"
-else
-    die "ssh public key not found: $ssh_path"
-    printf "       Generate: ssh-keygen -t ed25519\n"
-fi
-
 # --- terraform.tfvars ---
 if [[ -f "terraform.tfvars" ]]; then
     ok "terraform.tfvars exists"
+
+    ssh_key=$(awk -F '"' '/^[[:space:]]*ssh_public_key[[:space:]]*=[[:space:]]*"/ { print $2; exit }' terraform.tfvars)
+    if [[ "$ssh_key" =~ [^[:space:]] ]]; then
+        ok "ssh public key provided directly in terraform.tfvars"
+    else
+        die "set ssh_public_key to your SSH public key string in terraform.tfvars"
+    fi
 
     if grep -q 'compartment_id.*=.*"ocid1\.' terraform.tfvars 2>/dev/null; then
         ok "  compartment_id is set"

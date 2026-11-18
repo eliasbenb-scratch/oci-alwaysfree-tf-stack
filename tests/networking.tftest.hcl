@@ -74,6 +74,26 @@ run "rejects_boot_volume_below_oci_minimum" {
   expect_failures = [var.boot_volume_size_in_gbs]
 }
 
+run "rejects_empty_ssh_public_key" {
+  command = plan
+
+  variables {
+    ssh_public_key = ""
+  }
+
+  expect_failures = [var.ssh_public_key]
+}
+
+run "rejects_blank_ssh_public_key" {
+  command = plan
+
+  variables {
+    ssh_public_key = "   "
+  }
+
+  expect_failures = [var.ssh_public_key]
+}
+
 run "storage_configuration" {
   command = plan
 
