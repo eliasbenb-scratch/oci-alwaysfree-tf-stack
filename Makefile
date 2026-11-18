@@ -21,7 +21,7 @@ validate:
 test:
 > $(TERRAFORM) test -no-color
 > PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s tests -v
-> $(BATS) tests/preflight.bats
+> $(BATS) tests/preflight.bats tests/bootstrap.bats
 
 lint:
 > $(SHELLCHECK) scripts/preflight.sh scripts/bootstrap.sh

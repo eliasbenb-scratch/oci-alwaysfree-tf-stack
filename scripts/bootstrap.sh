@@ -14,7 +14,22 @@ log() {
 }
 
 apt_get() {
-  apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 "$@"
+  local deadline=$((SECONDS + 300)) status
+  local output_file="$work_dir/apt-output.log"
+
+  # DPkg::Lock::Timeout does not wait for apt-get update's package-list lock.
+  while true; do
+    if LC_ALL=C apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 "$@" 2>&1 | tee "$output_file"; then
+      return 0
+    else
+      status=$?
+    fi
+    if ! grep -qE '^E: Could not get lock .*It is held by process' "$output_file" || ((SECONDS >= deadline)); then
+      return "$status"
+    fi
+    log 'Another package manager holds the apt lock; retrying in 5 seconds'
+    sleep 5
+  done
 }
 
 host_config() {
@@ -166,4 +181,6 @@ main() {
   log 'Ready. Log in again to use the docker and incus-admin groups.'
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

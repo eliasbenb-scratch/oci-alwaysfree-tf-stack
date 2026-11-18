@@ -96,6 +96,8 @@ findmnt --mountpoint /data
 
 Retry storage with `/usr/bin/python3 /usr/local/lib/oci-host/host_config.py storage` or retry the optional bootstrap with `/usr/local/sbin/bootstrap-host` after fixing the cause. The scripts refuse to format disks with existing partitions or unknown filesystem signatures.
 
+The bootstrap retries apt lock contention for up to five minutes. If another package manager still holds the lock when that expires, let it finish, then run `sudo /usr/local/sbin/bootstrap-host` again. A manual retry prints progress in your terminal. Updating the local script does not update an existing guest's copy.
+
 ## Teardown
 
 ```bash
