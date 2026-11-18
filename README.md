@@ -1,165 +1,105 @@
-<!-- ABOUTME: README for the OCI Always Free ARM Terraform stack. -->
-<!-- ABOUTME: Covers quick start, configuration, free-tier limits, and teardown. -->
+# OCI ARM stack
 
-# oci-alwaysfree-tf-stack
+An Ubuntu 26.04 ARM instance on Oracle Cloud Infrastructure. The defaults are 4 OCPUs, 24 GB RAM, a 50 GB boot volume, and a 150 GB data volume.
 
-Terraform stack that provisions an Always Free ARM instance on Oracle Cloud, with VCN, subnet, and internet gateway. Auto-discovers the availability domain and latest Ubuntu 26.04 image so you don't need to look up region-specific OCIDs. The selected region must offer an Ubuntu 26.04 image compatible with `VM.Standard.A1.Flex`.
+The guest always prepares the data volume and mounts it at `/data`. `bootstrap_host` controls whether it then runs [scripts/bootstrap.sh](scripts/bootstrap.sh). The supplied script installs Docker CE and Zabbly Incus 7.0 LTS.
 
----
+## Deploy
 
-## What this builds
+Install Terraform and the OCI CLI, configure API credentials with `oci setup config`, and create an SSH key pair. See Oracle's [API key setup guide](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm).
 
-* 1 VCN
-* 1 Public Subnet
-* 1 Internet Gateway
-* A managed default security list allowing SSH (TCP port 22) from `0.0.0.0/0`
-* Up to 4 ARM Compute Instances
-* Up to 24GB Memory
-* A 50 GB boot volume and an attached 150 GB block volume, both at 120 VPUs per GB
+Copy the example and fill in `compartment_id`, `region`, and `ssh_public_key`:
 
----
-
-## Prerequisites
-
-* An active OCI account ([sign up for Always Free](https://www.oracle.com/cloud/free/)).
-* [Terraform](https://developer.hashicorp.com/terraform/install) installed.
-* OCI CLI installed and configured with API keys — see Oracle's [Required Keys and OCIDs](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm) guide for the full walkthrough. Quick version:
-  ```bash
-  uv tool install oci-cli   # or: pipx install oci-cli
-  oci setup config           # generates ~/.oci/config + API key pair
-  # Then upload ~/.oci/oci_api_key_public.pem to:
-  # OCI Console → Profile → My profile → API keys → Add API key
-  ```
-* An SSH key pair (`ssh-keygen -t ed25519` if you don't have one).
-
----
-
-## Quick Start / How to Use
-
-1. Copy the example variables file:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   ```
-
-2. Edit `terraform.tfvars` — set `compartment_id`, `region`, and `ssh_public_key`:
-   ```bash
-   # Find your compartment (tenancy) OCID:
-   oci iam compartment list --query 'data[0]."compartment-id"' --raw-output
-
-   # List available regions:
-   oci iam region list --query 'data[*].name' --raw-output
-   ```
-
-   Paste the full SSH public key into `ssh_public_key` as a quoted string. Keep the matching private key on your machine for SSH access.
-
-3. Run the preflight check to catch config issues before they become cryptic Terraform errors:
-   ```bash
-   ./preflight.sh
-   ```
-
-4. Deploy:
-   ```bash
-   terraform init
-   terraform plan
-   terraform apply
-   ```
-
----
-
-## File Structure
-
-```
-oci-alwaysfree-tf-stack/
-├── main.tf                  # Provider, data sources, networking, compute
-├── variables.tf             # Input variables (3 required, 6 with defaults)
-├── outputs.tf               # IPs, OCIDs for downstream use
-├── terraform.tfvars.example # Copy to terraform.tfvars and fill in
-├── preflight.sh             # Pre-deploy validation (OCI auth, keys, config)
-└── .gitignore               # Ignores tfstate, .terraform/, and tfvars
+```bash
+cp terraform.tfvars.example terraform.tfvars
 ```
 
----
+Use the full SSH public key as a quoted string. Keep the private key locally.
 
-## Configuration
+```bash
+./scripts/preflight.sh
+terraform init
+terraform plan
+terraform apply
+```
 
-`compartment_id`, `region`, and `ssh_public_key` are required. Everything else has sensible defaults.
+Wait for guest setup after Terraform finishes:
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `compartment_id` | `string` | *required* | OCID of the compartment (usually your tenancy OCID) |
-| `region` | `string` | *required* | OCI region identifier (e.g., `us-chicago-1`) |
-| `availability_domain_index` | `number` | `0` | Index into the AD list. Change if your preferred AD is full. |
-| `ssh_public_key` | `string` | *required* | Nonempty SSH public key string to authorize on the instance |
-| `name_prefix` | `string` | `"oci-arm"` | Prefix for resource display names and DNS labels |
-| `ocpus` | `number` | `4` | ARM OCPUs (Always Free max: 4 total) |
-| `memory_in_gbs` | `number` | `24` | Memory in GB (Always Free max: 24 total) |
-| `boot_volume_size_in_gbs` | `number` | `50` | Boot volume in GB (Always Free max: 200 total) |
-| `assign_public_ip` | `bool` | `true` | Keep a public IP for SSH and outbound Internet access through the Internet Gateway |
+```bash
+ssh ubuntu@$(terraform output -raw instance_public_ip) 'sudo cloud-init status --wait --long'
+```
 
----
+The region must offer an Ubuntu 26.04 image for `VM.Standard.A1.Flex`. Direct SSH and outbound access through the Internet Gateway need a public IP.
 
-## Accessing the Instance
+## Inputs
 
-**SSH in** once the instance is running:
-   ```bash
-   ssh -i ~/.ssh/your-key ubuntu@$(terraform output -raw instance_public_ip)
-   ```
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `compartment_id` | Required | OCI compartment or tenancy OCID |
+| `region` | Required | OCI region, such as `us-chicago-1` |
+| `ssh_public_key` | Required | Public key authorized for SSH |
+| `availability_domain_index` | `0` | Availability domain index |
+| `name_prefix` | `"oci-arm"` | Resource names and DNS labels |
+| `ocpus` | `4` | ARM OCPUs |
+| `memory_in_gbs` | `24` | RAM in GB |
+| `boot_volume_size_in_gbs` | `50` | Boot volume size in GB |
+| `block_volume_size_in_gbs` | `150` | Data block volume size in GB |
+| `volume_vpus_per_gb` | `10` | Performance units per GB shared by both volumes |
+| `assign_public_ip` | `true` | Assign a public IPv4 address |
+| `bootstrap_host` | `true` | Run the optional bootstrap script after mounting `/data` |
 
-The security list allows TCP port 22 from any IPv4 address (`0.0.0.0/0`). Authenticate with the private key matching the configured SSH public key.
+`bootstrap_host = false` skips the script. It does not skip disk preparation or undo an earlier bootstrap. Change the script to customize host setup.
 
-## Storage
+The VCN uses `10.0.0.0/16`; its subnet uses `10.0.0.0/24`. The bootstrap's Incus bridge uses `10.10.0.1/24`. That address is fixed in the helper and does not overlap the VCN or Docker's default pools.
 
-The OS boot volume defaults to 50 GB at 120 VPUs per GB. A separate 150 GB block volume at 120 VPUs per GB is attached to the instance in the same availability domain using an encrypted paravirtualized attachment. Retrieve its OCID with `terraform output -raw block_volume_id`.
+## Guest setup
 
-The data volume is attached as a raw disk. After deployment, identify it with `lsblk`, then create a filesystem and mount it before storing files. Terraform does not format the disk or configure a mount point.
+Cloud-init is defined in [main.tf](main.tf). It runs storage setup first and stops on failure. With bootstrap enabled, the script adds runtime bind mounts for Docker, containerd, and Incus, then installs the packages. The data volume is mounted at `/data`; runtime services require their bind mounts before they start. Incus uses `incusbr0` at `10.10.0.1/24`, with IPv4 NAT and IPv6 disabled.
 
-120 VPUs per GB is Oracle's Ultra High Performance tier. The current 4-OCPU `VM.Standard.A1.Flex` configuration does not support multipath Ultra High Performance block volume attachments; Oracle requires at least 16 OCPUs on that shape. The requested VPU settings are configured, but actual performance is constrained by the instance and attachment. See [Oracle's performance details](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeperformance.htm).
+The attachment uses `/dev/oracleoci/oraclevdb`; fstab uses the filesystem UUID. Changing an existing attachment's device can require detach/reattach. Review the plan before applying to an existing deployment. Updating metadata does not rerun cloud-init on an existing instance.
 
----
+Existing containers and application data are not recreated by the stack.
 
-## Always Free Guardrails
+## Capacity and performance
 
-The default storage capacity totals 200 GB across boot and data volumes, matching the home-region Always Free storage allowance when no other volumes consume it. The 120 VPUs per GB performance setting is separate from capacity; confirm your tenancy's billing treatment before applying. See [Oracle's storage allowance](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm#blockvolume) and [volume performance documentation](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeperformance.htm). If you change resource sizes, check the totals across all your instances:
+The defaults consume the home-region Always Free capacity allowance of 4 ARM OCPUs, 24 GB RAM, and 200 GB combined boot/data storage if no other resources are using it.
 
-| Resource | This stack uses | Always Free limit |
-|----------|----------------|-------------------|
-| ARM OCPUs | 4 | 4 total |
-| Memory | 24 GB | 24 GB total |
-| Boot + data volumes | 50 GB + 150 GB = 200 GB | 200 GB total |
-| Instances | 1 | Up to 4 ARM + 2 AMD |
-| VCN | 1 | Included |
+Both volumes use the shared `volume_vpus_per_gb` setting. The default of 10 VPUs/GB is Balanced Performance.
 
-**Cost Disclaimer: While this targets the Always Free tier, you are ultimately responsible for checking your OCI billing dashboard to ensure you haven't exceeded limits or selected the wrong region/shapes.**
+## Development
 
----
+The Terraform resources and cloud-init metadata are in [main.tf](main.tf). Guest configuration lives under [scripts/](scripts/). The tests use a mocked OCI provider and simulated disk commands.
 
-## Tearing Down
+With Terraform, Python 3, Bats, ShellCheck, and GNU Make installed:
+
+```bash
+terraform init -backend=false
+make check
+```
+
+`make format` formats Terraform. Indentation uses two spaces. Make recipes use `>` as their prefix so the Makefile does not need tabs.
+
+A disposable OCI deployment and reboot are needed to test the full boot path. The local tests do not create infrastructure or format real disks.
+
+## Troubleshooting
+
+Run `./scripts/preflight.sh` to check OCI authentication and the SSH key configuration. For intermittent 401 responses, check for trailing content after the private PEM file's closing footer. If the OCI CLI has Python dependency errors, install it with `uv tool install oci-cli` or `pipx install oci-cli`.
+
+For guest setup failures, inspect cloud-init and the data mount first:
+
+```bash
+sudo cloud-init status --long
+sudo tail -n 100 /var/log/cloud-init-output.log
+lsblk -f
+findmnt --mountpoint /data
+```
+
+Retry storage with `/usr/bin/python3 /usr/local/lib/oci-host/host_config.py storage` or retry the optional bootstrap with `/usr/local/sbin/bootstrap-host` after fixing the cause. The scripts refuse to format disks with existing partitions or unknown filesystem signatures.
+
+## Teardown
 
 ```bash
 terraform destroy
 ```
 
-Removes the instance, data block volume and its contents, VCN, subnet, and gateway. Terraform state tracks what was created, so the destroy is clean and complete.
-
----
-
-## Troubleshooting
-
-- **Intermittent 401-NotAuthenticated from Terraform**: Check that your PEM key file (`~/.oci/oci_api_key.pem`) ends cleanly with `-----END PRIVATE KEY-----` and nothing after it. The OCI CLI's Python SDK tolerates trailing junk, but the Terraform provider's Go SDK does not — it causes random auth failures where some API calls succeed and others don't. The `preflight.sh` script checks for this automatically.
-
-- **"Python X.Y not found" from OCI CLI**: Install with `uv tool install oci-cli` or `pipx install oci-cli` to use an isolated Python environment instead of depending on the system Python.
-
-## Notes
-
-- **OCI authentication**: The provider uses `~/.oci/config` by default. See the [OCI Terraform provider docs](https://registry.terraform.io/providers/oracle/oci/latest/docs) for alternatives (env vars, instance principal, etc.).
-
-- **Public IP lifecycle**: Keep `assign_public_ip = true` in this Internet Gateway topology for public SSH and outbound Internet access.
-
-- **Finding your OCIDs**:
-  ```bash
-  # Compartment (tenancy OCID)
-  oci iam compartment list --query 'data[0]."compartment-id"' --raw-output
-
-  # Available regions
-  oci iam region list --query 'data[*].name' --raw-output
-  ```
+This removes the instance, its boot volume, the data volume and its contents, and the managed networking resources.

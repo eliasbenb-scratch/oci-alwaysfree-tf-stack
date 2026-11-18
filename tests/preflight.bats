@@ -46,7 +46,7 @@ run_preflight() {
     HOME="$TEST_HOME" \
     PATH="$TEST_BIN:/usr/bin:/bin" \
     OCI_CLI_CONFIG_FILE="$TEST_HOME/.oci/config" \
-    "$REPO_ROOT/preflight.sh"
+    "$REPO_ROOT/scripts/preflight.sh"
 }
 
 @test "preflight accepts an encrypted PKCS8 private-key footer" {

@@ -1,6 +1,3 @@
-# ABOUTME: Input variables for the OCI Always Free ARM instance stack.
-# ABOUTME: Compartment ID, region, and an SSH public key string are required.
-
 variable "compartment_id" {
   description = "OCID of the compartment (usually your tenancy OCID for Always Free)"
   type        = string
@@ -35,7 +32,7 @@ variable "name_prefix" {
 
   validation {
     condition     = length(replace(lower(var.name_prefix), "/[^a-z0-9]/", "")) + 3 <= 15
-    error_message = "name_prefix is too long — the sanitized form plus suffix (e.g., 'vcn') must fit in 15 characters (OCI DNS label limit)."
+    error_message = "The sanitized name_prefix plus its suffix must fit the 15-character OCI DNS label limit."
   }
 }
 
@@ -62,8 +59,37 @@ variable "boot_volume_size_in_gbs" {
   }
 }
 
+variable "block_volume_size_in_gbs" {
+  description = "Data block volume size in GB (Always Free max: 200 GB total across volumes)"
+  type        = number
+  default     = 150
+
+  validation {
+    condition     = var.block_volume_size_in_gbs >= 50 && var.block_volume_size_in_gbs <= 32768
+    error_message = "block_volume_size_in_gbs must be between 50 and 32768 GB."
+  }
+}
+
+variable "volume_vpus_per_gb" {
+  description = "Performance units per GB shared by the boot and data block volumes"
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.volume_vpus_per_gb >= 0 && var.volume_vpus_per_gb <= 120 && var.volume_vpus_per_gb % 10 == 0
+    error_message = "volume_vpus_per_gb must be a multiple of 10 between 0 and 120."
+  }
+}
+
 variable "assign_public_ip" {
   description = "Assign a public IP for SSH access and outbound Internet access through the Internet Gateway"
   type        = bool
   default     = true
+}
+
+variable "bootstrap_host" {
+  description = "Run scripts/bootstrap.sh after the required /data setup on first boot"
+  type        = bool
+  default     = true
+  nullable    = false
 }

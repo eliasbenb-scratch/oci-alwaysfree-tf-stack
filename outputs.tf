@@ -1,6 +1,3 @@
-# ABOUTME: Outputs for the OCI instance stack — IPs, OCIDs, and
-# ABOUTME: resource identifiers for downstream use or SSH access.
-
 output "instance_id" {
   description = "OCID of the compute instance"
   value       = oci_core_instance.this.id
@@ -8,7 +5,7 @@ output "instance_id" {
 
 output "instance_public_ip" {
   description = "Public IP of the instance (empty if assign_public_ip is false)"
-  value       = oci_core_instance.this.public_ip
+  value       = var.assign_public_ip ? oci_core_public_ip.this[0].ip_address : ""
 }
 
 output "instance_private_ip" {
@@ -32,6 +29,6 @@ output "subnet_id" {
 }
 
 output "block_volume_id" {
-  description = "OCID of the 150 GB data block volume"
+  description = "OCID of the data block volume"
   value       = oci_core_volume.data.id
 }

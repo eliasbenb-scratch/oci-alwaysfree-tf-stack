@@ -1,20 +1,20 @@
-# ABOUTME: Example tfvars for the OCI stack. Copy to terraform.tfvars
-# ABOUTME: and fill in your compartment OCID, region, and SSH public key string.
-
-# Required — find with: oci iam compartment list --query 'data[0]."compartment-id"' --raw-output
+# Required: find with: oci iam compartment list --query 'data[0]."compartment-id"' --raw-output
 compartment_id = "ocid1.tenancy.oc1..aaaa..."
 
-# Required — list with: oci iam region list --query 'data[*].name' --raw-output
+# Required: list with: oci iam region list --query 'data[*].name' --raw-output
 region = "us-chicago-1"
 
-# Required — paste your SSH public key, keeping the matching private key locally.
+# Required: paste your SSH public key, keeping the matching private key locally.
 ssh_public_key = "ssh-ed25519 AAAA... your-key-comment"
 
-# Everything below has sensible defaults — uncomment to override.
+# Optional overrides.
 
 # availability_domain_index = 0
 # name_prefix               = "oci-arm"
 # ocpus                     = 4
 # memory_in_gbs             = 24
 # boot_volume_size_in_gbs   = 50
+# block_volume_size_in_gbs  = 150
+# volume_vpus_per_gb        = 10
 # assign_public_ip          = true
+# bootstrap_host            = true
